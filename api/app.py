@@ -1,17 +1,31 @@
-# api/app.py
 from flask import Flask, request, jsonify
 import joblib
+import os
 import pandas as pd
 from datetime import datetime
+
 from src.preprocess import clean_text, extract_domain, source_cred_score
+from src.train_model import train_model_with_meta
 
 app = Flask(__name__)
 
 # -----------------------------
-# Load trained model
+# Load or auto-train model
 # -----------------------------
 MODEL_PATH = "model/pipeline_with_meta.pkl"
-pipeline = joblib.load(MODEL_PATH)
+
+def load_or_train_model():
+    """Load model if exists, otherwise train a new one."""
+    if not os.path.exists(MODEL_PATH):
+        print("⚠️ Model not found — training new model...")
+        train_model_with_meta(MODEL_PATH)
+        print("✅ Model trained and saved successfully.")
+    else:
+        print("✅ Loaded existing model.")
+    return joblib.load(MODEL_PATH)
+
+pipeline = load_or_train_model()
+
 
 # -----------------------------
 # Root route
@@ -22,6 +36,7 @@ def home():
         "message": "📰 Fake News Detector API",
         "usage": "POST to /predict with JSON {text, source (optional), publish_date (optional)}"
     })
+
 
 # -----------------------------
 # Predict route
@@ -46,8 +61,8 @@ def predict():
     headline_len = len(content.split())
     punct_count = sum(1 for c in content if c in "!?.,")
     upper_ratio = sum(1 for c in content if c.isupper()) / max(1, len(content))
-        # Add these near where you compute upper_ratio, etc.
     exclamation_ratio = content.count('!') / max(1, len(content))
+
     clickbait_words = [
         "shocking", "breaking", "amazing", "you won't believe", "exclusive",
         "unbelievable", "surprising", "secret", "revealed", "crazy", "must see"
@@ -58,7 +73,7 @@ def predict():
         try:
             pd_date = pd.to_datetime(publish_date)
             age_days = (pd.Timestamp.now() - pd_date).days
-        except:
+        except Exception:
             age_days = 99999
     else:
         age_days = 99999
@@ -83,6 +98,7 @@ def predict():
     confidence = round(float(max(proba)) * 100, 2)
 
     return jsonify({"label": label, "confidence": confidence})
+
 
 if __name__ == "__main__":
     app.run(debug=True)
