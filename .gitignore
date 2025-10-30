@@ -1,0 +1,66 @@
+# =======================================
+# 🧩 PYTHON & ENVIRONMENT
+# =======================================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+venv/
+.env
+.env.*
+.vscode/
+.idea/
+
+# =======================================
+# 🧠 MODEL & DATA FILES
+# =======================================
+# Model artifacts
+*.pkl
+*.joblib
+*.sav
+*.dat
+
+# Data files
+*.csv
+*.csv.zip
+*.tsv
+*.xlsx
+*.xls
+
+# Keep the model directory but ignore contents
+model/*
+!model/.gitkeep
+
+# =======================================
+# 🧪 TEMPORARY & DEVELOPMENT FILES
+# =======================================
+temp.py
+temp2.py
+verify_data_files.ipynb
+
+# Caches
+*.log
+*.tmp
+
+# =======================================
+# 📦 STREAMLIT
+# =======================================
+# Streamlit cache and config files
+.streamlit/secrets.toml
+.streamlit/config.yaml
+
+# Keep global style configuration
+!.streamlit/config.toml
+
+# =======================================
+# 🧱 BYTECODE, TESTS, & API CACHES
+# =======================================
+src/__pycache__/
+api/__pycache__/
+
+# =======================================
+# 🗂️ OS / SYSTEM FILES
+# =======================================
+.DS_Store
+Thumbs.db
