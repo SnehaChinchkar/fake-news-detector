@@ -1,48 +1,71 @@
-from flask import Flask, request, jsonify
-import joblib
+# api/app.py
 import os
+import joblib
 import pandas as pd
 from datetime import datetime
+from flask import Flask, request, jsonify
 
+from create_kaggle_config import ensure_kaggle_config_from_env
 from src.preprocess import clean_text, extract_domain, source_cred_score
 from src.train_model import train_model_with_meta
+from flask_cors import CORS
+# ------------------------------------------------
+# Configuration
+# ------------------------------------------------
+# MODEL_PATH = os.path.abspath("storage/fake_news_model_with_meta.pkl")
+ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
+MODEL_PATH = os.path.join(ROOT_DIR, "storage", "fake_news_model.joblib")
 
 app = Flask(__name__)
+ALLOWED_ORIGIN = os.getenv("ALLOWED_ORIGIN", "*")  # default to "*" if not set
 
-# -----------------------------
-# Load or auto-train model
-# -----------------------------
-MODEL_PATH = "model/pipeline_with_meta.pkl"
+CORS(app, origins=[ALLOWED_ORIGIN])
+ensure_kaggle_config_from_env()  # ensure Kaggle credentials/configs are available
 
-def load_or_train_model():
-    """Load model if exists, otherwise train a new one."""
-    if not os.path.exists(MODEL_PATH):
-        print("⚠️ Model not found — training new model...")
+
+# ------------------------------------------------
+# Health check
+# ------------------------------------------------
+@app.route("/")
+def health():
+    return "📰 Fake News Detector API is running with metadata support"
+
+
+# ------------------------------------------------
+# Training trigger
+# ------------------------------------------------
+@app.route("/init", methods=["POST"])
+def init_train():
+    """
+    Trigger dataset download + model training.
+    Protected by INIT_TOKEN environment variable.
+    """
+    INIT_TOKEN = os.getenv("INIT_TOKEN")
+    auth = request.headers.get("Authorization", "")
+
+    if INIT_TOKEN and auth != f"Bearer {INIT_TOKEN}":
+        return jsonify({"error": "unauthorized"}), 401
+
+    try:
+        # Run metadata-based training
         train_model_with_meta(MODEL_PATH)
-        print("✅ Model trained and saved successfully.")
-    else:
-        print("✅ Loaded existing model.")
-    return joblib.load(MODEL_PATH)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-pipeline = load_or_train_model()
+    return jsonify({"status": "training complete"})
 
 
-# -----------------------------
-# Root route
-# -----------------------------
-@app.route('/', methods=['GET'])
-def home():
-    return jsonify({
-        "message": "📰 Fake News Detector API",
-        "usage": "POST to /predict with JSON {text, source (optional), publish_date (optional)}"
-    })
-
-
-# -----------------------------
-# Predict route
-# -----------------------------
-@app.route('/predict', methods=['POST'])
+# ------------------------------------------------
+# Prediction endpoint
+# ------------------------------------------------
+@app.route("/predict", methods=["POST"])
 def predict():
+    """
+    Predict whether given text (and optional metadata) is Fake or Real news.
+    """
+    if not os.path.exists(MODEL_PATH):
+        return jsonify({"error": "model not found. run /init first."}), 400
+
     data = request.get_json(force=True)
 
     text = data.get("text", "").strip()
@@ -52,12 +75,13 @@ def predict():
     if not text:
         return jsonify({"error": "Missing 'text' field"}), 400
 
-    # Clean + prepare
+    # ------------------------------------------------
+    # Preprocess text and extract metadata
+    # ------------------------------------------------
     content = clean_text(text)
     domain = extract_domain(source)
     cred = source_cred_score(domain)
 
-    # Compute derived metadata
     headline_len = len(content.split())
     punct_count = sum(1 for c in content if c in "!?.,")
     upper_ratio = sum(1 for c in content if c.isupper()) / max(1, len(content))
@@ -78,7 +102,9 @@ def predict():
     else:
         age_days = 99999
 
-    # Prepare input row
+    # ------------------------------------------------
+    # Create DataFrame for model
+    # ------------------------------------------------
     X = pd.DataFrame([{
         "content": content,
         "source_domain": domain,
@@ -91,14 +117,21 @@ def predict():
         "source_cred": cred
     }])
 
-    # Predict
+    # ------------------------------------------------
+    # Load model and predict
+    # ------------------------------------------------
+    pipeline = joblib.load(MODEL_PATH)
     pred = pipeline.predict(X)[0]
     proba = pipeline.predict_proba(X)[0]
+
     label = "Real" if pred == 1 else "Fake"
     confidence = round(float(max(proba)) * 100, 2)
 
     return jsonify({"label": label, "confidence": confidence})
 
 
+# ------------------------------------------------
+# Run server
+# ------------------------------------------------
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=True)

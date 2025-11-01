@@ -7,38 +7,40 @@ from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import RandomForestClassifier
-from preprocess import load_and_clean_data
+from src.preprocess import load_and_clean_data
 
-def train_model_with_meta(model_path="model/pipeline_with_meta.pkl"):
-    # -----------------------------
-    # Load and preprocess data
-    # -----------------------------
-    data_path = os.getenv("DATA_PATH", "/var/data/custom_short_texts.csv")
+
+# =====================================================
+# ✅ Full training function (local or dev use)
+# =====================================================
+def train_model_with_meta(model_path="storage/fake_news_model.joblib"):
+    """
+    Standalone training function for local dev testing.
+    Loads dataset from DATA_PATH env or default local CSV,
+    trains model, and saves pipeline to storage/.
+    """
+    data_path = os.getenv(
+        "DATA_PATH",
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "custom_short_texts.csv")
+    )
 
     if not os.path.exists(data_path):
         raise FileNotFoundError(f"❌ Dataset not found at {data_path}")
 
-    print(f"🔹 Loading and preprocessing data from: {data_path}")
-    df = load_and_clean_data(data_path)
-    print(f"✅ Loaded {len(df)} samples from {data_path}")
+    print(f"[INFO] Loading and preprocessing data from: {data_path}")
+    df = load_and_clean_data(os.path.dirname(data_path))
+
+    print(f"[INFO] Loaded {len(df)} samples")
 
     X = df.drop(columns=["label"])
     y = df["label"]
 
-    print(f"Dataset shape: {X.shape}, Labels: {y.value_counts().to_dict()}")
-
-    # -----------------------------
-    # Define columns
-    # -----------------------------
     text_col = "content"
     numeric_cols = [
         "headline_len", "punct_count", "upper_ratio",
         "exclamation_ratio", "clickbait_score", "age_days", "source_cred"
     ]
 
-    # -----------------------------
-    # Preprocessor
-    # -----------------------------
     preprocessor = ColumnTransformer(
         transformers=[
             ("text", TfidfVectorizer(max_features=8000, ngram_range=(1, 2)), text_col),
@@ -47,40 +49,104 @@ def train_model_with_meta(model_path="model/pipeline_with_meta.pkl"):
         remainder="drop"
     )
 
-    # -----------------------------
-    # Build model pipeline
-    # -----------------------------
-    pipe = Pipeline([
-        ("preprocessor", preprocessor),
-        ("clf", RandomForestClassifier(
-            n_estimators=250,
-            max_depth=None,
-            class_weight="balanced",
-            random_state=42,
-            n_jobs=-1
-        ))
-    ])
-
-    # -----------------------------
-    # Train/test split
-    # -----------------------------
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
+    clf = RandomForestClassifier(
+        n_estimators=250,
+        max_depth=None,
+        class_weight="balanced",
+        random_state=42,
+        n_jobs=-1
     )
 
-    print("🔹 Training model...")
-    pipe.fit(X_train, y_train)
+    pipe = Pipeline([
+        ("preprocessor", preprocessor),
+        ("clf", clf)
+    ])
+
+    # --- Sample weights for short texts ---
+    short_text_mask = X["headline_len"] < 10  # short/custom samples
+    sample_weights = pd.Series(1.0, index=X.index)
+    sample_weights[short_text_mask] = 0.5  # reduce weight for short samples
+
+    X_train, X_test, y_train, y_test, sw_train, sw_test = train_test_split(
+        X, y, sample_weights, test_size=0.2, random_state=42
+    )
+
+    print("[INFO] Training model with sample weights...")
+    pipe.fit(X_train, y_train, clf__sample_weight=sw_train)
 
     acc = pipe.score(X_test, y_test)
-    print(f"✅ Model accuracy: {acc:.4f}")
+    print(f"[OK] Model accuracy: {acc:.4f}")
 
-    # -----------------------------
-    # Save trained model
-    # -----------------------------
     os.makedirs(os.path.dirname(model_path), exist_ok=True)
     joblib.dump(pipe, model_path)
-    print(f"💾 Saved trained model to {model_path}")
+    print(f"[SAVED] Trained model stored at: {model_path}")
 
 
+# =====================================================
+# ✅ Wrapper for train_runner.py / Flask `/init`
+# =====================================================
+def train_and_save(data_folder, model_path):
+    """
+    Universal training wrapper for cloud or local use.
+    Automatically finds the Kaggle dataset CSV in the folder.
+    """
+    print(f"[INFO] Preparing to train using data folder: {data_folder}")
+
+    csv_candidates = [f for f in os.listdir(data_folder) if f.endswith(".csv")]
+    if not csv_candidates:
+        raise FileNotFoundError(f"No CSV files found in {data_folder}")
+    data_path = os.path.join(data_folder, csv_candidates[0])
+    print(f"[INFO] Found dataset: {data_path}")
+
+    df = load_and_clean_data(os.path.dirname(data_path))
+    print(f"[INFO] Loaded {len(df)} rows from Kaggle dataset")
+
+    X = df.drop(columns=["label"])
+    y = df["label"]
+
+    text_col = "content"
+    numeric_cols = [
+        "headline_len", "punct_count", "upper_ratio",
+        "exclamation_ratio", "clickbait_score", "age_days", "source_cred"
+    ]
+
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ("text", TfidfVectorizer(max_features=8000, ngram_range=(1, 2)), text_col),
+            ("num", StandardScaler(), numeric_cols),
+        ],
+        remainder="drop"
+    )
+
+    clf = RandomForestClassifier(
+        n_estimators=250,
+        max_depth=None,
+        class_weight="balanced",
+        random_state=42,
+        n_jobs=-1
+    )
+
+    pipe = Pipeline([
+        ("preprocessor", preprocessor),
+        ("clf", clf)
+    ])
+
+    # --- Sample weights for short texts ---
+    short_text_mask = X["headline_len"] < 10
+    sample_weights = pd.Series(1.0, index=X.index)
+    sample_weights[short_text_mask] = 0.5  # half weight for short/custom samples
+
+    print("[INFO] Training RandomForestClassifier pipeline with sample weights...")
+    pipe.fit(X, y, clf__sample_weight=sample_weights)
+
+    os.makedirs(os.path.dirname(model_path), exist_ok=True)
+    joblib.dump(pipe, model_path)
+    print(f"[SAVED] Model successfully stored at: {model_path}")
+
+
+# =====================================================
+# ✅ Optional local test entry point
+# =====================================================
 if __name__ == "__main__":
+    print("[INFO] Running standalone training (local test)...")
     train_model_with_meta()
