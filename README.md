@@ -5,6 +5,21 @@ Install dependencies using:
 ```bash
 pip install -r requirements.txt
 ```
+## Environment Variables
+
+This project uses environment variables for sensitive/configurable settings.
+
+1. Create a `.env` file in the project root and add:
+```env
+KAGGLE_USERNAME=
+KAGGLE_KEY=
+DATA_PATH=data
+```
+
+2. Install python-dotenv if needed:
+```bash
+pip install python-dotenv
+```
 
 ## Dataset
 This project uses the **Fake and Real News Dataset** from Kaggle:  

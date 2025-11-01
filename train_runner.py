@@ -1,11 +1,9 @@
-# train_runner.py
 import os
 import shutil
 import kagglehub
 
 from create_kaggle_config import ensure_kaggle_config_from_env
 
-# adapt paths
 KAGGLE_DATASET = "clmentbisaillon/fake-and-real-news-dataset"
 # DATA_DIR = os.path.abspath("data")
 # MODEL_PATH = os.path.abspath("storage/fake_news_model.joblib")

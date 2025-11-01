@@ -9,10 +9,6 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import RandomForestClassifier
 from src.preprocess import load_and_clean_data
 
-
-# =====================================================
-# ✅ Full training function (local or dev use)
-# =====================================================
 def train_model_with_meta(model_path="storage/fake_news_model.joblib"):
     """
     Standalone training function for local dev testing.
@@ -62,7 +58,6 @@ def train_model_with_meta(model_path="storage/fake_news_model.joblib"):
         ("clf", clf)
     ])
 
-    # --- Sample weights for short texts ---
     short_text_mask = X["headline_len"] < 10  # short/custom samples
     sample_weights = pd.Series(1.0, index=X.index)
     sample_weights[short_text_mask] = 0.5  # reduce weight for short samples
@@ -82,9 +77,7 @@ def train_model_with_meta(model_path="storage/fake_news_model.joblib"):
     print(f"[SAVED] Trained model stored at: {model_path}")
 
 
-# =====================================================
-# ✅ Wrapper for train_runner.py / Flask `/init`
-# =====================================================
+#  Wrapper for train_runner.py / Flask `/init`
 def train_and_save(data_folder, model_path):
     """
     Universal training wrapper for cloud or local use.
@@ -131,7 +124,6 @@ def train_and_save(data_folder, model_path):
         ("clf", clf)
     ])
 
-    # --- Sample weights for short texts ---
     short_text_mask = X["headline_len"] < 10
     sample_weights = pd.Series(1.0, index=X.index)
     sample_weights[short_text_mask] = 0.5  # half weight for short/custom samples
@@ -144,9 +136,6 @@ def train_and_save(data_folder, model_path):
     print(f"[SAVED] Model successfully stored at: {model_path}")
 
 
-# =====================================================
-# ✅ Optional local test entry point
-# =====================================================
 if __name__ == "__main__":
     print("[INFO] Running standalone training (local test)...")
     train_model_with_meta()

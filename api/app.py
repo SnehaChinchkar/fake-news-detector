@@ -9,31 +9,22 @@ from create_kaggle_config import ensure_kaggle_config_from_env
 from src.preprocess import clean_text, extract_domain, source_cred_score
 from src.train_model import train_model_with_meta
 from flask_cors import CORS
-# ------------------------------------------------
-# Configuration
-# ------------------------------------------------
-# MODEL_PATH = os.path.abspath("storage/fake_news_model_with_meta.pkl")
+
 ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
 MODEL_PATH = os.path.join(ROOT_DIR, "storage", "fake_news_model.joblib")
 
 app = Flask(__name__)
-ALLOWED_ORIGIN = os.getenv("ALLOWED_ORIGIN", "*")  # default to "*" if not set
+ALLOWED_ORIGIN = os.getenv("ALLOWED_ORIGIN", "*")  
 
 CORS(app, origins=[ALLOWED_ORIGIN])
-ensure_kaggle_config_from_env()  # ensure Kaggle credentials/configs are available
+ensure_kaggle_config_from_env()  
 
 
-# ------------------------------------------------
-# Health check
-# ------------------------------------------------
 @app.route("/")
 def health():
     return "📰 Fake News Detector API is running with metadata support"
 
 
-# ------------------------------------------------
-# Training trigger
-# ------------------------------------------------
 @app.route("/init", methods=["POST"])
 def init_train():
     """
@@ -47,7 +38,6 @@ def init_train():
         return jsonify({"error": "unauthorized"}), 401
 
     try:
-        # Run metadata-based training
         train_model_with_meta(MODEL_PATH)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -55,9 +45,7 @@ def init_train():
     return jsonify({"status": "training complete"})
 
 
-# ------------------------------------------------
-# Prediction endpoint
-# ------------------------------------------------
+
 @app.route("/predict", methods=["POST"])
 def predict():
     """
@@ -75,9 +63,7 @@ def predict():
     if not text:
         return jsonify({"error": "Missing 'text' field"}), 400
 
-    # ------------------------------------------------
     # Preprocess text and extract metadata
-    # ------------------------------------------------
     content = clean_text(text)
     domain = extract_domain(source)
     cred = source_cred_score(domain)
@@ -102,9 +88,6 @@ def predict():
     else:
         age_days = 99999
 
-    # ------------------------------------------------
-    # Create DataFrame for model
-    # ------------------------------------------------
     X = pd.DataFrame([{
         "content": content,
         "source_domain": domain,
@@ -117,9 +100,7 @@ def predict():
         "source_cred": cred
     }])
 
-    # ------------------------------------------------
     # Load model and predict
-    # ------------------------------------------------
     pipeline = joblib.load(MODEL_PATH)
     pred = pipeline.predict(X)[0]
     proba = pipeline.predict_proba(X)[0]
@@ -129,9 +110,5 @@ def predict():
 
     return jsonify({"label": label, "confidence": confidence})
 
-
-# ------------------------------------------------
-# Run server
-# ------------------------------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=True)

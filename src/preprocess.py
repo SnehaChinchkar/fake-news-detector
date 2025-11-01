@@ -4,17 +4,12 @@ import re
 from datetime import datetime
 from urllib.parse import urlparse
 
-# -----------------------------
-# ✅ Step 1 — Environment-aware data path
-# -----------------------------
 DATA_DIR = os.getenv(
     "DATA_PATH",
     os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 )
 
-# -----------------------------
-# Domain + credibility helpers
-# -----------------------------
+
 def extract_domain(url_or_source):
     """Extract domain from URL or text source."""
     if pd.isna(url_or_source):
@@ -35,7 +30,6 @@ CRED_LOOKUP = {
     "cnbc.com": 1.0, "usatoday.com": 1.0, "abcnews.go.com": 1.0, "dw.com": 1.0,
     "indiatimes.com": 0.8, "thehindu.com": 1.0, "hindustantimes.com": 0.8,
     "ndtv.com": 1.0,
-    # Low-credibility or fake sources
     "thepoliticalinsider.com": -1.2, "politicususa.com": -1.0,
     "dailybuzzlive.com": -1.5, "libertywritersnews.com": -1.5,
     "worldnewsdailyreport.com": -1.5, "news4ktla.com": -1.5,
@@ -53,9 +47,7 @@ def source_cred_score(domain, default=-0.2):
             return v
     return default
 
-# -----------------------------
-# Text + metadata preprocessing
-# -----------------------------
+# text and metadata preprocessing
 def clean_text(text):
     """Basic cleaning for article text."""
     text = re.sub(r"http\S+", "", str(text))
@@ -63,7 +55,7 @@ def clean_text(text):
     text = re.sub(r"\s+", " ", text).strip()
     return text.lower()
 
-# Clickbait-related keywords
+
 CLICKBAIT_WORDS = [
     "shocking", "breaking", "amazing", "you won't believe", "exclusive",
     "unbelievable", "surprising", "secret", "revealed", "crazy", "must see"
@@ -98,9 +90,7 @@ def make_metadata(df):
 
     return df
 
-# -----------------------------
-# ✅ Load + prepare dataset
-# -----------------------------
+# load and prepare dataset
 def load_and_clean_data(data_dir=DATA_DIR):
     """
     Load, clean, and combine True/Fake news + optional short samples.
@@ -115,10 +105,10 @@ def load_and_clean_data(data_dir=DATA_DIR):
         if os.path.exists(project_data_path):
             custom_path = project_data_path
 
-    df = pd.DataFrame()  # placeholder
+    df = pd.DataFrame() 
     kaggle_loaded = False
 
-    # --- Try Kaggle dataset ---
+
     if os.path.exists(true_path) and os.path.exists(fake_path):
         true_df = pd.read_csv(true_path)
         fake_df = pd.read_csv(fake_path)
@@ -137,7 +127,7 @@ def load_and_clean_data(data_dir=DATA_DIR):
     else:
         print("⚠️ WARNING: Kaggle True/Fake CSVs not found — proceeding with custom dataset only.")
 
-    # --- Combine title + text if Kaggle data exists ---
+
     if not df.empty:
         df["content"] = (df["title"].fillna("") + " " + df["text"].fillna("")).apply(clean_text)
         df = make_metadata(df)
@@ -149,7 +139,6 @@ def load_and_clean_data(data_dir=DATA_DIR):
         "age_days", "source_cred", "label"
     ]
 
-    # --- Try to add custom dataset ---
     if os.path.exists(custom_path):
         custom = pd.read_csv(custom_path)
         custom["label"] = custom["label"].astype(int)
@@ -163,7 +152,6 @@ def load_and_clean_data(data_dir=DATA_DIR):
         custom["age_days"] = 99999
         custom["source_cred"] = 0.0
 
-        # --- Filter very short custom texts ---
         MIN_WORDS = 5
         before_len = len(custom)
         custom = custom[custom["headline_len"] >= MIN_WORDS]

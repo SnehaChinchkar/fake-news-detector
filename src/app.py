@@ -1,4 +1,3 @@
-# src/app.py
 import streamlit as st
 import requests
 from datetime import datetime
@@ -30,9 +29,9 @@ if st.button("🔍 Analyze"):
                 conf = data.get("confidence", 0)
 
                 if label.lower() == "real":
-                    st.success(f"🟢 Predicted as **Real** ({conf:.2f}% confidence)")
+                    st.success(f" Predicted as **Real** ({conf:.2f}% confidence)")
                 else:
-                    st.error(f"🔴 Predicted as **Fake** ({conf:.2f}% confidence)")
+                    st.error(f" Predicted as **Fake** ({conf:.2f}% confidence)")
             else:
                 st.error(f"API Error: {res.text}")
 
