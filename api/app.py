@@ -9,7 +9,8 @@ from create_kaggle_config import ensure_kaggle_config_from_env
 from src.preprocess import clean_text, extract_domain, source_cred_score
 from src.train_model import train_model_with_meta
 from flask_cors import CORS
-
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
 MODEL_PATH = os.path.join(ROOT_DIR, "storage", "fake_news_model.joblib")
 
