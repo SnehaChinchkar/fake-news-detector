@@ -22,7 +22,8 @@ venv/
 *.dat
 
 # Data files
-*.csv
+Fake.csv
+True.csv
 *.csv.zip
 *.tsv
 *.xlsx
