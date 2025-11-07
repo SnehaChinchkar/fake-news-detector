@@ -10,16 +10,27 @@ from sklearn.ensemble import RandomForestClassifier
 from src.preprocess import load_and_clean_data
 
 
-def safe_remove(file_path: str):
-    """Remove a file safely if it exists."""
-    if os.path.exists(file_path):
-        try:
-            os.remove(file_path)
-            print(f"🧹 Removed {file_path}")
-        except Exception as e:
-            print(f"⚠️ Failed to remove {file_path}: {e}")
-    else:
-        print(f"ℹ️ File not found (skip): {file_path}")
+def cleanup_dataset_files(dataset_folder: str):
+    """
+    Safely remove True.csv, Fake.csv, and custom_short_texts.csv anywhere inside the dataset folder.
+    Handles nested KaggleHub folder structures automatically.
+    """
+    targets = {"True.csv", "Fake.csv", "custom_short_texts.csv"}
+    removed = set()
+
+    for root, _, files in os.walk(dataset_folder):
+        for file in files:
+            if file in targets:
+                file_path = os.path.join(root, file)
+                try:
+                    os.remove(file_path)
+                    removed.add(file)
+                    print(f"🧹 Removed {file_path}")
+                except Exception as e:
+                    print(f"⚠️ Failed to remove {file_path}: {e}")
+
+    for t in targets - removed:
+        print(f"ℹ️ File not found (skip): {t}")
 
 
 def train_model_with_meta(model_path="storage/fake_news_model.joblib"):
@@ -38,6 +49,7 @@ def train_model_with_meta(model_path="storage/fake_news_model.joblib"):
 
     print(f"[INFO] Loading and preprocessing data from: {data_path}")
     df = load_and_clean_data(os.path.dirname(data_path))
+
     print(f"[INFO] Loaded {len(df)} samples")
 
     X = df.drop(columns=["label"])
@@ -70,9 +82,9 @@ def train_model_with_meta(model_path="storage/fake_news_model.joblib"):
         ("clf", clf)
     ])
 
-    short_text_mask = X["headline_len"] < 10
+    short_text_mask = X["headline_len"] < 10  # short/custom samples
     sample_weights = pd.Series(1.0, index=X.index)
-    sample_weights[short_text_mask] = 0.5
+    sample_weights[short_text_mask] = 0.5  # reduce weight for short samples
 
     X_train, X_test, y_train, y_test, sw_train, sw_test = train_test_split(
         X, y, sample_weights, test_size=0.2, random_state=42
@@ -88,35 +100,29 @@ def train_model_with_meta(model_path="storage/fake_news_model.joblib"):
     joblib.dump(pipe, model_path)
     print(f"[SAVED] Trained model stored at: {model_path}")
 
-    # 🧹 Cleanup custom short dataset (since we only use it in meta training)
-    safe_remove(data_path)
+    # 🧹 Cleanup (custom_short_texts.csv only, since True/Fake aren't used here)
+    cleanup_dataset_files(os.path.dirname(data_path))
 
 
 def train_and_save(data_folder, model_path):
     """
     Universal training wrapper for cloud or local use.
     Automatically finds the Kaggle dataset CSVs in the folder,
-    loads, trains, and cleans up files progressively.
+    merges them with custom_short_texts.csv, trains, and then
+    performs safe cleanup of all dataset files.
     """
     print(f"[INFO] Preparing to train using data folder: {data_folder}")
 
-    # Locate datasets
-    true_path = os.path.join(data_folder, "True.csv")
-    fake_path = os.path.join(data_folder, "Fake.csv")
-    custom_path = os.path.join(data_folder, "custom_short_texts.csv")
+    csv_candidates = [f for f in os.listdir(data_folder) if f.endswith(".csv")]
+    if not csv_candidates:
+        raise FileNotFoundError(f"No CSV files found in {data_folder}")
 
-    if not (os.path.exists(true_path) and os.path.exists(fake_path)):
-        raise FileNotFoundError(f"❌ Missing one or both CSV files in {data_folder}")
+    data_path = os.path.join(data_folder, csv_candidates[0])
+    print(f"[INFO] Found dataset: {data_path}")
 
-    print(f"[INFO] Found True/Fake datasets at: {data_folder}")
-
-    # 🧠 Load and preprocess
-    df = load_and_clean_data(data_folder)
+    # 🧠 Load and combine datasets (Kaggle + custom)
+    df = load_and_clean_data(os.path.dirname(data_path))
     print(f"[INFO] Loaded {len(df)} rows from Kaggle + custom datasets")
-
-    # 🧹 Cleanup Kaggle originals (after loading into memory)
-    safe_remove(true_path)
-    safe_remove(fake_path)
 
     X = df.drop(columns=["label"])
     y = df["label"]
@@ -150,7 +156,7 @@ def train_and_save(data_folder, model_path):
 
     short_text_mask = X["headline_len"] < 10
     sample_weights = pd.Series(1.0, index=X.index)
-    sample_weights[short_text_mask] = 0.5
+    sample_weights[short_text_mask] = 0.5  # half weight for short/custom samples
 
     print("[INFO] Training RandomForestClassifier pipeline with sample weights...")
     pipe.fit(X, y, clf__sample_weight=sample_weights)
@@ -159,7 +165,12 @@ def train_and_save(data_folder, model_path):
     joblib.dump(pipe, model_path)
     print(f"[SAVED] Model successfully stored at: {model_path}")
 
-    safe_remove(custom_path)
+    # 🧹 Clean up all dataset files after training
+    try:
+        cleanup_dataset_files(data_folder)
+        print("✅ Cleanup complete.")
+    except Exception as e:
+        print(f"⚠️ Cleanup failed: {e}")
 
 
 if __name__ == "__main__":
