@@ -9,30 +9,6 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import RandomForestClassifier
 from src.preprocess import load_and_clean_data
 
-
-def safe_cleanup_dataset_files(base_folder):
-    """
-    Safely remove True.csv, Fake.csv, and custom_dataset.csv recursively from base_folder.
-    This ensures cleanup works whether files are in /data/ or in KaggleHub cache.
-    """
-    targets = {"True.csv", "Fake.csv", "custom_dataset.csv"}
-    removed = set()
-
-    for root, _, files in os.walk(base_folder):
-        for f in files:
-            if f in targets:
-                file_path = os.path.join(root, f)
-                try:
-                    os.remove(file_path)
-                    removed.add(f)
-                    print(f"🧹 Removed: {file_path}")
-                except Exception as e:
-                    print(f"⚠️ Failed to remove {file_path}: {e}")
-
-    for t in targets - removed:
-        print(f"ℹ️ File not found (skip): {t}")
-
-
 def train_model_with_meta(model_path="storage/fake_news_model.joblib"):
     """
     Standalone training function for local dev testing.
@@ -101,6 +77,7 @@ def train_model_with_meta(model_path="storage/fake_news_model.joblib"):
     print(f"[SAVED] Trained model stored at: {model_path}")
 
 
+#  Wrapper for train_runner.py / Flask `/init`
 def train_and_save(data_folder, model_path):
     """
     Universal training wrapper for cloud or local use.
@@ -157,14 +134,13 @@ def train_and_save(data_folder, model_path):
     os.makedirs(os.path.dirname(model_path), exist_ok=True)
     joblib.dump(pipe, model_path)
     print(f"[SAVED] Model successfully stored at: {model_path}")
-
-    # ✅ Cleanup (now works for KaggleHub)
     try:
-        safe_cleanup_dataset_files(data_folder)
-        print("✅ Cleanup complete.")
+        os.remove("data/custom_dataset.csv") 
+        os.remove("data/Fake.csv")
+        os.remove("data/True.csv")
+        print("🧹 Temporary datasets deleted to save space.")
     except Exception as e:
         print(f"⚠️ Cleanup failed: {e}")
-
 
 if __name__ == "__main__":
     print("[INFO] Running standalone training (local test)...")
