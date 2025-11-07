@@ -2,6 +2,8 @@ import os
 import streamlit as st
 import requests
 from datetime import datetime
+from dotenv import load_dotenv
+load_dotenv()
 
 # API_URL = "http://127.0.0.1:5000/predict"
 API_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:5000") + "/predict"
