@@ -10,22 +10,22 @@ from sklearn.ensemble import RandomForestClassifier
 from src.preprocess import load_and_clean_data
 
 
-def cleanup_dataset_files(dataset_folder: str):
+def safe_cleanup_dataset_files(base_folder):
     """
-    Safely remove True.csv, Fake.csv, and custom_short_texts.csv anywhere inside the dataset folder.
-    Handles nested KaggleHub folder structures automatically.
+    Safely remove True.csv, Fake.csv, and custom_dataset.csv recursively from base_folder.
+    This ensures cleanup works whether files are in /data/ or in KaggleHub cache.
     """
-    targets = {"True.csv", "Fake.csv", "custom_short_texts.csv"}
+    targets = {"True.csv", "Fake.csv", "custom_dataset.csv"}
     removed = set()
 
-    for root, _, files in os.walk(dataset_folder):
-        for file in files:
-            if file in targets:
-                file_path = os.path.join(root, file)
+    for root, _, files in os.walk(base_folder):
+        for f in files:
+            if f in targets:
+                file_path = os.path.join(root, f)
                 try:
                     os.remove(file_path)
-                    removed.add(file)
-                    print(f"🧹 Removed {file_path}")
+                    removed.add(f)
+                    print(f"🧹 Removed: {file_path}")
                 except Exception as e:
                     print(f"⚠️ Failed to remove {file_path}: {e}")
 
@@ -100,29 +100,22 @@ def train_model_with_meta(model_path="storage/fake_news_model.joblib"):
     joblib.dump(pipe, model_path)
     print(f"[SAVED] Trained model stored at: {model_path}")
 
-    # 🧹 Cleanup (custom_short_texts.csv only, since True/Fake aren't used here)
-    cleanup_dataset_files(os.path.dirname(data_path))
-
 
 def train_and_save(data_folder, model_path):
     """
     Universal training wrapper for cloud or local use.
-    Automatically finds the Kaggle dataset CSVs in the folder,
-    merges them with custom_short_texts.csv, trains, and then
-    performs safe cleanup of all dataset files.
+    Automatically finds the Kaggle dataset CSV in the folder.
     """
     print(f"[INFO] Preparing to train using data folder: {data_folder}")
 
     csv_candidates = [f for f in os.listdir(data_folder) if f.endswith(".csv")]
     if not csv_candidates:
         raise FileNotFoundError(f"No CSV files found in {data_folder}")
-
     data_path = os.path.join(data_folder, csv_candidates[0])
     print(f"[INFO] Found dataset: {data_path}")
 
-    # 🧠 Load and combine datasets (Kaggle + custom)
     df = load_and_clean_data(os.path.dirname(data_path))
-    print(f"[INFO] Loaded {len(df)} rows from Kaggle + custom datasets")
+    print(f"[INFO] Loaded {len(df)} rows from Kaggle dataset")
 
     X = df.drop(columns=["label"])
     y = df["label"]
@@ -165,9 +158,9 @@ def train_and_save(data_folder, model_path):
     joblib.dump(pipe, model_path)
     print(f"[SAVED] Model successfully stored at: {model_path}")
 
-    # 🧹 Clean up all dataset files after training
+    # ✅ Cleanup (now works for KaggleHub)
     try:
-        cleanup_dataset_files(data_folder)
+        safe_cleanup_dataset_files(data_folder)
         print("✅ Cleanup complete.")
     except Exception as e:
         print(f"⚠️ Cleanup failed: {e}")
