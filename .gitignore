@@ -24,6 +24,7 @@ venv/
 # Data files
 Fake.csv
 True.csv
+*.csv
 *.csv.zip
 *.tsv
 *.xlsx
