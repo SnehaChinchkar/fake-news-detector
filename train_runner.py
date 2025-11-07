@@ -36,9 +36,15 @@ def run_training():
     dataset_folder = download_dataset()
     print("Dataset ready at:", dataset_folder)
 
+    # Create custom dataset
+    from src.create_short_dataset import create_custom_dataset
+    create_custom_dataset(dataset_folder)
+
+    # Train model
     from src.train_model import train_and_save
     train_and_save(dataset_folder, MODEL_PATH)
     print("Model saved to:", MODEL_PATH)
+
 
 if __name__ == "__main__":
     run_training()
