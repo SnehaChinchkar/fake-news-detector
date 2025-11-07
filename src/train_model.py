@@ -9,6 +9,26 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import RandomForestClassifier
 from src.preprocess import load_and_clean_data
 
+
+def cleanup_dataset_files(dataset_folder: str):
+    """Safely remove dataset files (True.csv, Fake.csv, custom_short_texts.csv) if they exist."""
+    files_to_remove = [
+        os.path.join(dataset_folder, "custom_short_texts.csv"),
+        os.path.join(dataset_folder, "Fake.csv"),
+        os.path.join(dataset_folder, "True.csv"),
+    ]
+
+    for file_path in files_to_remove:
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                print(f"🧹 Removed {file_path}")
+            except Exception as e:
+                print(f"⚠️ Failed to remove {file_path}: {e}")
+        else:
+            print(f"ℹ️ File not found (skip): {file_path}")
+
+
 def train_model_with_meta(model_path="storage/fake_news_model.joblib"):
     """
     Standalone training function for local dev testing.
@@ -77,7 +97,6 @@ def train_model_with_meta(model_path="storage/fake_news_model.joblib"):
     print(f"[SAVED] Trained model stored at: {model_path}")
 
 
-#  Wrapper for train_runner.py / Flask `/init`
 def train_and_save(data_folder, model_path):
     """
     Universal training wrapper for cloud or local use.
@@ -134,13 +153,12 @@ def train_and_save(data_folder, model_path):
     os.makedirs(os.path.dirname(model_path), exist_ok=True)
     joblib.dump(pipe, model_path)
     print(f"[SAVED] Model successfully stored at: {model_path}")
+
     try:
-        os.remove("data/custom_dataset.csv")
-        os.remove("data/Fake.csv")
-        os.remove("data/True.csv")
-        print("🧹 Temporary datasets deleted to save space.")
+        cleanup_dataset_files(data_folder)
     except Exception as e:
         print(f"⚠️ Cleanup failed: {e}")
+
 
 if __name__ == "__main__":
     print("[INFO] Running standalone training (local test)...")
