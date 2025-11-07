@@ -134,7 +134,13 @@ def train_and_save(data_folder, model_path):
     os.makedirs(os.path.dirname(model_path), exist_ok=True)
     joblib.dump(pipe, model_path)
     print(f"[SAVED] Model successfully stored at: {model_path}")
-
+    try:
+        os.remove("data/custom_dataset.csv")
+        os.remove("data/Fake.csv")
+        os.remove("data/True.csv")
+        print("🧹 Temporary datasets deleted to save space.")
+    except Exception as e:
+        print(f"⚠️ Cleanup failed: {e}")
 
 if __name__ == "__main__":
     print("[INFO] Running standalone training (local test)...")
