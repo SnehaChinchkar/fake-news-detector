@@ -1,8 +1,10 @@
+import os
 import streamlit as st
 import requests
 from datetime import datetime
 
-API_URL = "http://127.0.0.1:5000/predict"
+# API_URL = "http://127.0.0.1:5000/predict"
+API_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:5000") + "/predict"
 
 st.set_page_config(page_title="Fake News Detector", page_icon="📰", layout="centered")
 
