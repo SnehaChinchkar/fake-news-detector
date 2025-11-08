@@ -18,8 +18,8 @@ def prepare_dirs():
 def download_dataset():
     print("Downloading dataset with kagglehub...")
     # path = kagglehub.dataset_download(KAGGLE_DATASET, force=False)
-    path = kagglehub.dataset_download(KAGGLE_DATASET)
-
+    # path = kagglehub.dataset_download(KAGGLE_DATASET)
+    path = kagglehub.dataset_download(KAGGLE_DATASET, force=True)
 
     if os.path.isfile(path) and path.endswith(".zip"):
         import zipfile
@@ -34,6 +34,8 @@ def run_training():
     prepare_dirs()
     ensure_kaggle_config_from_env()
     dataset_folder = download_dataset()
+    # Export dataset folder for downstream code
+    os.environ["DATA_PATH"] = dataset_folder
     print("Dataset ready at:", dataset_folder)
 
     # Create custom dataset
