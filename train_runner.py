@@ -19,7 +19,9 @@ def download_dataset():
     print("Downloading dataset with kagglehub...")
     # path = kagglehub.dataset_download(KAGGLE_DATASET, force=False)
     # path = kagglehub.dataset_download(KAGGLE_DATASET)
-    path = kagglehub.dataset_download(KAGGLE_DATASET, force=True)
+    path = kagglehub.dataset_download(KAGGLE_DATASET, force_download=True)
+
+
 
     if os.path.isfile(path) and path.endswith(".zip"):
         import zipfile
