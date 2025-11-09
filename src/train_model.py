@@ -1,6 +1,7 @@
 import os
 import joblib
 import pandas as pd
+import shutil
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
@@ -8,6 +9,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import RandomForestClassifier
 from src.preprocess import load_and_clean_data
+
 
 def train_model_with_meta(model_path="storage/fake_news_model.joblib"):
     """
@@ -77,11 +79,11 @@ def train_model_with_meta(model_path="storage/fake_news_model.joblib"):
     print(f"[SAVED] Trained model stored at: {model_path}")
 
 
-#  Wrapper for train_runner.py / Flask `/init`
 def train_and_save(data_folder, model_path):
     """
     Universal training wrapper for cloud or local use.
     Automatically finds the Kaggle dataset CSV in the folder.
+    After training completes, cleans up large Kaggle cache files.
     """
     print(f"[INFO] Preparing to train using data folder: {data_folder}")
 
@@ -128,12 +130,31 @@ def train_and_save(data_folder, model_path):
     sample_weights = pd.Series(1.0, index=X.index)
     sample_weights[short_text_mask] = 0.5  # half weight for short/custom samples
 
-    print("[INFO] Training RandomForestClassifier pipeline with sample weights...")
-    pipe.fit(X, y, clf__sample_weight=sample_weights)
+    try:
+        print("[INFO] Training RandomForestClassifier pipeline with sample weights...")
+        pipe.fit(X, y, clf__sample_weight=sample_weights)
 
-    os.makedirs(os.path.dirname(model_path), exist_ok=True)
-    joblib.dump(pipe, model_path)
-    print(f"[SAVED] Model successfully stored at: {model_path}")
+        os.makedirs(os.path.dirname(model_path), exist_ok=True)
+        joblib.dump(pipe, model_path)
+        print(f"[SAVED] Model successfully stored at: {model_path}")
+
+    finally:
+        # ✅ CLEANUP: Remove Kaggle CSV cache files safely
+        print("[CLEANUP] Removing cached Kaggle CSVs to free up space...")
+        deleted = 0
+        cleanup_targets = ["Fake.csv", "True.csv", "custom_short_texts.csv"]
+
+        for fname in cleanup_targets:
+            fpath = os.path.join(data_folder, fname)
+            if os.path.exists(fpath):
+                try:
+                    os.remove(fpath)
+                    print(f"🗑️  Deleted {fpath}")
+                    deleted += 1
+                except Exception as e:
+                    print(f"[WARN] Could not delete {fpath}: {e}")
+
+        print(f"[CLEANUP DONE] {deleted} CSV file(s) removed from cache.\n")
 
 
 if __name__ == "__main__":
